@@ -7,7 +7,8 @@ import numpy as np
 import pickle
 import linecache
 import math
-
+import sys
+import tqdm
 import torch
 from torch import tensor
 import torch.nn as nn
@@ -36,7 +37,13 @@ class softattention(nn.Module):
 		self.attlinear=nn.Linear(dim*2,dim,False)
 	
 	def forward(self,target_t,context):
+		# print('target_t')
+		# print(target_t)
+		# print('context')
+		# print(context)
+		
 		atten=torch.bmm(context,target_t.unsqueeze(2)).sum(2)
+		# print('*'*30)
 		mask=((atten!=0).float()-1)*1e9
 		atten=atten+mask
 		atten=nn.Softmax(dim=1)(atten)
@@ -78,12 +85,12 @@ class lstm_target(nn.Module):
 		
 		if self.speaker:
 			self.persona_embedding=nn.Embedding(persona_num,dim)
-			self.lstmt=nn.LSTM(dim*3,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout)
+			self.lstmt=nn.LSTM(dim*3,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout) #TODO:
 		elif self.addressee:
 			self.persona_embedding=nn.Embedding(persona_num,dim)
 			self.speaker_linear = nn.Linear(dim,dim)
 			self.addressee_linear = nn.Linear(dim,dim)
-			self.lstmt=nn.LSTM(dim*3,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout)
+			self.lstmt=nn.LSTM(dim*3,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout) #TODO:
 		else:
 			self.lstmt=nn.LSTM(dim*2,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout)
 		self.atten_feed=attention_feed()
@@ -119,6 +126,8 @@ class lstm(nn.Module):
 		dim = params.dimension
 		init_weight = params.init_weight
 		vocab_num = vocab_num + params.special_word
+		print('vocab_num')
+		print(vocab_num)
 		self.UNK = params.UNK+params.special_word
 		self.EOT = EOT
 		self.params=params
@@ -192,6 +201,7 @@ class persona:
 		with open(path.join(self.params.data_folder,self.params.dictPath),'r') as doc:
 			for line in doc:
 				self.voc[line.strip()] = len(self.voc)
+		# print(self.voc)
 
 	def test(self):
 		open_train_file=path.join(self.params.data_folder,self.params.dev_file)
@@ -210,14 +220,34 @@ class persona:
 			addressee_label=addressee_label.to(self.device)
 			length=length.to(self.device)
 			total_tokens+=token_num
+			
 			self.Model.eval()
+			# print(batch_n)
+			
 			with torch.no_grad():
+				# print('sources')
+				# print(sources)
+				# print('targets')
+				# print(targets)
+				# print('length')
+				# print(length)
+				# print('speaker_label')
+				# print(speaker_label)
+				# print('addressee_label')
+				# print(addressee_label)
+				
 				loss = self.Model(sources,targets,length,speaker_label,addressee_label)
+				# print('loss')
+				# print(loss)
+				# print('*'*100)
+
+
 				total_loss+=loss.item()
 		print("perp "+str((1/math.exp(-total_loss/total_tokens))))
 		if self.output!="":
 			with open(self.output,"a") as selfoutput:
 				selfoutput.write("standard perp "+str((1/math.exp(-total_loss/total_tokens)))+"\n")
+				
 
 	def update(self):
 		lr=self.params.alpha
@@ -261,12 +291,11 @@ class persona:
 			self.readModel(self.params.save_folder,self.params,fine_tuning_model,re_random_weights)
 		self.iter=0
 		start_halving=False
-		self.lr=self.params.alpha
-		print("iter  "+str(self.iter))
-		self.test()
-		while True:
+		self.lr=self.params.alpha		
+		# while True:
+		for epoch in tqdm.tqdm(range(self.params.epochs)):
 			self.iter+=1
-			print("iter  "+str(self.iter))
+			# print("iter  "+str(self.iter))
 			if self.output!="":
 				with open(self.output,"a") as selfoutput:
 					selfoutput.write("iter  "+str(self.iter)+"\n")
@@ -275,12 +304,16 @@ class persona:
 			open_train_file=path.join(self.params.data_folder,self.params.train_file)
 			END=0
 			batch_n=0
-			while END==0:
+			# while END==0:
+			for iters in tqdm.tqdm(range(int(self.params.train_size/self.params.batch_size) +1 )):
+				
 				self.Model.zero_grad()
 				END,sources,targets,speaker_label,addressee_label,length,_,_ = self.Data.read_batch(open_train_file,batch_n)
 				batch_n+=1
 				if sources is None:
+					
 					continue
+					
 				sources=sources.to(self.device)
 				targets=targets.to(self.device)
 				speaker_label=speaker_label.to(self.device)
@@ -288,11 +321,25 @@ class persona:
 				length=length.to(self.device)
 				self.source_size = sources.size(0)
 				self.Model.train()
+				
 				loss = self.Model(sources,targets,length,speaker_label,addressee_label)
 				loss.backward()
+				# print('loss',loss)
 				self.update()
+				if iters%self.params.eval_steps==0:
+					print('epoch',epoch,'iter',iters/int(960114/self.params.batch_size),' ',end='')
+					self.test()
+
+				if END!=0:
+					break
+			# print("iter  "+str(self.iter))
+			
+				# print(self.iter,self.params.eval_steps)
+				# print("iter xxx "+str(self.iter))
+				# sys.exit(-1)
 			self.test()
-			if not self.params.no_save:
-				self.save()
-			if self.iter==self.params.max_iter:
-				break
+			if self.iter%self.params.save_steps==0:
+				if not self.params.no_save:
+					self.save()
+			# if self.iter==self.params.max_iter:
+			# 	break
