@@ -46,7 +46,9 @@ parser.add_argument("--eval_steps", type=int, default=5000)
 parser.add_argument("--epochs", type=int, default=10)
 parser.add_argument("--train_size", type=int, default=960114)
 
-
+parser.add_argument('--PersonaDim', type=int, default=40)
+parser.add_argument('--debug', action='store_true')
+parser.add_argument('--PersonaEmbFiles', type=str, default='None')
 
 args = parser.parse_args()
 print(args)
