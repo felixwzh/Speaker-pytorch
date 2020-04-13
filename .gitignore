@@ -1,2 +1,5 @@
 .ipynb_checkpoints/
 data/
+save/
+outputs/
+__pycache__

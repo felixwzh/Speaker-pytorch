@@ -156,10 +156,10 @@ class decode_model(persona):
 
 		if self.params.SpeakerMode:
 			decode_output = path.join(self.params.output_folder,
-							self.params.decode_file+"_S"+str(self.params.SpeakerId)+"_"+self.params.output_file)
+							self.params.decode_file+"_Speaker_"+self.params.output_file)
 		elif self.params.AddresseeMode:
 			decode_output = path.join(self.params.output_folder,
-							self.params.decode_file+"_S"+str(self.params.SpeakerId)+"A"+str(self.params.AddresseeId)+"_"+self.params.output_file)
+							self.params.decode_file+"_Addressee_"+self.params.output_file)
 		else:
 			decode_output = path.join(self.params.output_folder,self.params.decode_file+"_"+self.params.output_file)
 		with open(decode_output,"w") as open_write_file:
@@ -176,8 +176,8 @@ class decode_model(persona):
 				break
 			if sources is None:
 				continue
-			speaker_label.fill_(self.params.SpeakerId-1)
-			addressee_label.fill_(self.params.AddresseeId-1)
+# 			speaker_label.fill_(self.params.SpeakerId-1)
+# 			addressee_label.fill_(self.params.AddresseeId-1)
 			sources=sources.to(self.device)
 			targets=targets.to(self.device)
 			speaker_label=speaker_label.to(self.device)
@@ -190,10 +190,10 @@ class decode_model(persona):
 			self.Model.eval()
 			with torch.no_grad():
 				completed_history = self.Model(sources,targets,length,speaker_label,addressee_label,self.mode)
-			self.OutPut(decode_output,completed_history)
+			self.OutPut(decode_output,completed_history,speaker_label,addressee_label)
 		print("decoding done")
 
-	def OutPut(self,decode_output,completed_history):
+	def OutPut(self,decode_output,completed_history,speaker_label,addressee_label):
 		for i in range(self.source_size):
 			if self.params.response_only:
 				print_string=self.id2word(completed_history[i].cpu().numpy())
@@ -202,8 +202,8 @@ class decode_model(persona):
 			else:
 				### If the data contains words, not numbers:
 				# print_string = origin
-				print_string = self.id2word(self.origin[i])
-				print_string += "|"
+				print_string = str(int(speaker_label[i].cpu())+1)+' '+self.id2word(self.origin[i])
+				print_string += "￨"+str(int(addressee_label[i].cpu())+1)+' '
 				print_string += self.id2word(completed_history[i].cpu().numpy())
 				with open(decode_output,"a") as file:
 					file.write(print_string+"\n")

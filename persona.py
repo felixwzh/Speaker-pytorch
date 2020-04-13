@@ -83,10 +83,10 @@ class lstm_target(nn.Module):
 		self.addressee = params.AddresseeMode
 		persona_num = params.PersonaNum
 		
-		if self.speaker:
+		if self.speaker:#TODO:
 			self.persona_embedding=nn.Embedding(persona_num,dim)
 			self.lstmt=nn.LSTM(dim*3,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout) #TODO:
-		elif self.addressee:
+		elif self.addressee:#TODO:
 			self.persona_embedding=nn.Embedding(persona_num,dim)
 			self.speaker_linear = nn.Linear(dim,dim)
 			self.addressee_linear = nn.Linear(dim,dim)
