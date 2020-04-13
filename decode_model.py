@@ -124,7 +124,8 @@ class decode_model(persona):
 		self.readModel(self.params.model_folder,self.params.model_name)
 		self.Model.to(self.device)
 		self.ReadDictDecode()
-
+		# make the output_folder
+		Path(params.output_folder).mkdir(parents=True, exist_ok=True)
 		self.output=path.join(self.params.output_folder,self.params.log_file)
 		if self.output!="":
 			with open(self.output,"w") as selfoutput:

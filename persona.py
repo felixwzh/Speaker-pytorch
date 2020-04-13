@@ -14,7 +14,7 @@ import torch
 from torch import tensor
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence,pad_packed_sequence
-
+from pathlib import Path
 
 class attention_feed(nn.Module):
 	
@@ -240,6 +240,8 @@ class persona:
 			self.Model = torch.nn.DataParallel(self.Model)
 
 		self.Model.to(self.device)
+		# make the save_folder
+		Path(params.save_folder).mkdir(parents=True, exist_ok=True)
 
 		self.output=path.join(params.save_folder,params.output_file)
 		if self.output!="":
