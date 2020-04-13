@@ -46,6 +46,8 @@ parser.add_argument("--eval_steps", type=int, default=5000)
 parser.add_argument("--epochs", type=int, default=10)
 parser.add_argument("--train_size", type=int, default=960114)
 
+parser.add_argument('--gpu', default='0,1,2,3', type=str, help='id(s) for CUDA_VISIBLE_DEVICES')
+
 
 
 args = parser.parse_args()

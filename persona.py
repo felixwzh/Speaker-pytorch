@@ -1,6 +1,7 @@
 from data import data
 
 from os import path
+import os
 from io import open
 import string
 import numpy as np
@@ -66,6 +67,8 @@ class lstm_source(nn.Module):
 	def forward(self,embedding,length):
 		embedding = self.dropout(embedding)
 		packed=pack_padded_sequence(embedding,length,batch_first=True,enforce_sorted=False)
+		
+		self.lstms.flatten_parameters()# FIXME:
 		packed_output,(h,c)=self.lstms(packed)
 		context,_= pad_packed_sequence(packed_output,batch_first=True)
 		return context,h,c
@@ -114,6 +117,7 @@ class lstm_target(nn.Module):
 			combined_embed = self.speaker_linear(speaker_embed) + self.addressee_linear(addressee_embed)
 			combined_embed = nn.Tanh()(combined_embed)
 			lstm_input=torch.cat((lstm_input,combined_embed),-1)
+		self.lstmt.flatten_parameters()# FIXME:
 		_,(h,c)=self.lstmt(lstm_input.unsqueeze(1),(h,c))
 		pred=self.soft_atten(h[-1],context)
 		return pred,h,c
@@ -149,6 +153,21 @@ class lstm(nn.Module):
 		self.loss_function=torch.nn.CrossEntropyLoss(w, ignore_index=0, reduction='sum')
 
 	def forward(self,sources,targets,length,speaker_label,addressee_label):
+		# print('sources')
+		# print(sources.shape)
+		# print(sources)
+		# print('targets')
+		# print(targets.shape)
+		# print(targets)
+		# print('speaker_label')
+		# print(speaker_label.shape)
+		# print(speaker_label)
+		# print('addressee_label')
+		# print(addressee_label.shape)
+		# print(addressee_label)
+		# print('length')
+		# print(length.shape)
+		# print(length)
 		source_embed=self.sembed(sources)
 		context,h,c=self.encoder(source_embed,length)
 		loss=0
@@ -165,7 +184,14 @@ class persona:
 	
 	def __init__(self, params):
 		self.params=params
- 
+
+		os.environ['CUDA_VISIBLE_DEVICES'] = self.params.gpu
+		use_cuda = torch.cuda.is_available()
+		device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+		self.params.device = device
+		self.params.n_gpu = torch.cuda.device_count()
+		print("gpu num: ", self.params.n_gpu)
+
 		self.ReadDict()
 		self.Data=data(params,self.voc)
 
@@ -176,6 +202,10 @@ class persona:
 		self.Model.encoder.apply(self.weights_init)
 		self.Model.decoder.apply(self.weights_init)
 		self.Model.softlinear.apply(self.weights_init)
+
+		if self.params.n_gpu > 1:
+			self.Model = torch.nn.DataParallel(self.Model)
+
 		self.Model.to(self.device)
 
 		self.output=path.join(params.save_folder,params.output_file)
@@ -237,6 +267,8 @@ class persona:
 				# print(addressee_label)
 				
 				loss = self.Model(sources,targets,length,speaker_label,addressee_label)
+				if self.params.n_gpu >= 1:
+					loss = loss.sum()
 				# print('loss')
 				# print(loss)
 				# print('*'*100)
@@ -309,6 +341,8 @@ class persona:
 				
 				self.Model.zero_grad()
 				END,sources,targets,speaker_label,addressee_label,length,_,_ = self.Data.read_batch(open_train_file,batch_n)
+
+
 				batch_n+=1
 				if sources is None:
 					
@@ -319,10 +353,28 @@ class persona:
 				speaker_label=speaker_label.to(self.device)
 				addressee_label=addressee_label.to(self.device)
 				length=length.to(self.device)
+				# print('sources')
+				# print(sources.shape)
+				# print(sources)
+				# print('targets')
+				# print(targets.shape)
+				# print(targets)
+				# print('speaker_label')
+				# print(speaker_label.shape)
+				# print(speaker_label)
+				# print('addressee_label')
+				# print(addressee_label.shape)
+				# print(addressee_label)
+				# print('length')
+				# print(length.shape)
+				# print(length)				
 				self.source_size = sources.size(0)
 				self.Model.train()
 				
 				loss = self.Model(sources,targets,length,speaker_label,addressee_label)
+				if self.params.n_gpu >= 1:
+					loss = loss.sum()
+				# print(loss)
 				loss.backward()
 				# print('loss',loss)
 				self.update()
