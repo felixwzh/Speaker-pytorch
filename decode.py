@@ -16,13 +16,13 @@ parser.add_argument('--output_file', type=str, default='output.txt')
 
 parser.add_argument('--cpu', action='store_true')
 
-# parser.add_argument('--SpeakerMode', action='store_true')
-# parser.add_argument('--AddresseeMode', action='store_true')
+parser.add_argument('--SpeakerMode', action='store_true')
+parser.add_argument('--AddresseeMode', action='store_true')
 parser.add_argument('--SpeakerId', type=int, default=1)
-parser.add_argument('--AddresseeId', type=int, default=2)
+parser.add_argument('--AddresseeId', type=int, default=1)
 
 parser.add_argument("--batch_size", type=int, default=256)
-parser.add_argument("--max_decoding_length", type=int, default=20)
+parser.add_argument("--max_decoding_length", type=int, default=128)
 parser.add_argument('--max_decoding_number', type=int, default=0)
 parser.add_argument('--allowUNK', action='store_true')
 parser.add_argument('--response_only', action='store_true')

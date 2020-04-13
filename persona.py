@@ -1,5 +1,5 @@
 from data import data
-
+import sys
 from os import path
 import os
 from io import open
@@ -80,6 +80,7 @@ class lstm_target(nn.Module):
 		super(lstm_target, self).__init__()
 		
 		dim = params.dimension
+		persona_dim=params.PersonaDim
 		layer = params.layers
 		self.dropout = nn.Dropout(p=params.dropout)
 		self.speaker = params.SpeakerMode
@@ -87,17 +88,48 @@ class lstm_target(nn.Module):
 		persona_num = params.PersonaNum
 		
 		if self.speaker:
-			self.persona_embedding=nn.Embedding(persona_num,dim)
-			self.lstmt=nn.LSTM(dim*3,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout) #TODO:
+			self.persona_embedding=nn.Embedding(persona_num,persona_dim)
+
+			# load emb
+			if params.PersonaEmbFiles!='None':
+				emb_files=params.PersonaEmbFiles.split(',')
+				embs_list=[]
+				for emb_file in emb_files:
+					embs=self.read_emb_file(emb_file)
+					embs_list.append(embs)
+
+				merged_emb=np.concatenate(embs_list,axis=1)
+				assert merged_emb.shape[0]==persona_num,(merged_emb.shape[1],persona_num)
+				assert merged_emb.shape[1]==persona_dim,(merged_emb.shape[1],persona_dim)
+				self.persona_embedding.weight.data.copy_(torch.from_numpy(merged_emb))
+				print('init persona embedding from file',emb_files)
+			else:
+				print('randomly init persona embedding')
+
+			if params.debug:
+				pass
+				# self.persona_embedding.weight.requires_grad = False # TODO:
+
+			self.lstmt=nn.LSTM(dim*2+persona_dim,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout) 
 		elif self.addressee:
-			self.persona_embedding=nn.Embedding(persona_num,dim)
-			self.speaker_linear = nn.Linear(dim,dim)
-			self.addressee_linear = nn.Linear(dim,dim)
-			self.lstmt=nn.LSTM(dim*3,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout) #TODO:
+			self.persona_embedding=nn.Embedding(persona_num,persona_dim)
+			self.speaker_linear = nn.Linear(persona_dim,persona_dim)
+			self.addressee_linear = nn.Linear(persona_dim,persona_dim)
+			self.lstmt=nn.LSTM(dim*2+persona_dim,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout) 
 		else:
 			self.lstmt=nn.LSTM(dim*2,dim,num_layers=layer,batch_first=True,bias=False,dropout=params.dropout)
 		self.atten_feed=attention_feed()
 		self.soft_atten=softattention(params)
+	def read_emb_file(self,emb_file):
+		embs=[]
+		with open(emb_file,'r') as fin:
+			lines = fin.readlines()
+			for i,line in enumerate(lines):
+				line = line.strip().split()
+				emb=[float(em) for em in line]
+				embs.append(emb)
+		embs=np.array(embs)
+		return embs
 		
 	def forward(self,context,h,c,embedding,speaker_label,addressee_label):
 		embedding = self.dropout(embedding)
@@ -183,6 +215,7 @@ class lstm(nn.Module):
 class persona:
 	
 	def __init__(self, params):
+		self.best_dev_ppl=np.inf
 		self.params=params
 
 		os.environ['CUDA_VISIBLE_DEVICES'] = self.params.gpu
@@ -275,7 +308,11 @@ class persona:
 
 
 				total_loss+=loss.item()
+		ppl=1/math.exp(-total_loss/total_tokens)
 		print("perp "+str((1/math.exp(-total_loss/total_tokens))))
+		if ppl<self.best_dev_ppl:
+			self.best_dev_ppl=ppl
+			self.save_best()
 		if self.output!="":
 			with open(self.output,"a") as selfoutput:
 				selfoutput.write("standard perp "+str((1/math.exp(-total_loss/total_tokens)))+"\n")
@@ -297,6 +334,11 @@ class persona:
 		save_path = path.join(self.params.save_folder,self.params.save_prefix)
 		torch.save(self.Model.state_dict(),save_path+str(self.iter))
 		print("finished saving")
+
+	def save_best(self):
+		save_path = path.join(self.params.save_folder,self.params.save_prefix)
+		torch.save(self.Model.state_dict(),save_path+'best')
+		print("finished saving best model")
 
 	def saveParams(self):
 		save_params_path = path.join(self.params.save_folder,self.params.save_params)
@@ -337,6 +379,9 @@ class persona:
 			END=0
 			batch_n=0
 			# while END==0:
+			# if self.params.debug:
+			# 	self.save()
+			# 	sys.exit(-1)			
 			for iters in tqdm.tqdm(range(int(self.params.train_size/self.params.batch_size) +1 )):
 				
 				self.Model.zero_grad()
@@ -381,6 +426,7 @@ class persona:
 				if iters%self.params.eval_steps==0:
 					print('epoch',epoch,'iter',iters/int(960114/self.params.batch_size),' ',end='')
 					self.test()
+
 
 				if END!=0:
 					break
