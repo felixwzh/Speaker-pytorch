@@ -38,13 +38,8 @@ class softattention(nn.Module):
 		self.attlinear=nn.Linear(dim*2,dim,False)
 	
 	def forward(self,target_t,context):
-		# print('target_t')
-		# print(target_t)
-		# print('context')
-		# print(context)
 		
 		atten=torch.bmm(context,target_t.unsqueeze(2)).sum(2)
-		# print('*'*30)
 		mask=((atten!=0).float()-1)*1e9
 		atten=atten+mask
 		atten=nn.Softmax(dim=1)(atten)
@@ -68,7 +63,6 @@ class lstm_source(nn.Module):
 		embedding = self.dropout(embedding)
 		packed=pack_padded_sequence(embedding,length,batch_first=True,enforce_sorted=False)
 		
-		self.lstms.flatten_parameters()# FIXME:
 		packed_output,(h,c)=self.lstms(packed)
 		context,_= pad_packed_sequence(packed_output,batch_first=True)
 		return context,h,c
@@ -99,10 +93,13 @@ class lstm_target(nn.Module):
 					embs_list.append(embs)
 
 				merged_emb=np.concatenate(embs_list,axis=1)
-				assert merged_emb.shape[0]==persona_num,(merged_emb.shape[1],persona_num)
-				assert merged_emb.shape[1]==persona_dim,(merged_emb.shape[1],persona_dim)
-				self.persona_embedding.weight.data.copy_(torch.from_numpy(merged_emb))
+				assert merged_emb.shape[0]==persona_num,(merged_emb.shape[0],persona_num)
+				assert merged_emb.shape[1]<=persona_dim,(merged_emb.shape[1],persona_dim)
+				rand_init_emb=self.persona_embedding.weight.data.cpu().numpy()
+				rand_init_emb[:,0:merged_emb.shape[1]]=merged_emb
+				self.persona_embedding.weight.data.copy_(torch.from_numpy(rand_init_emb))
 				print('init persona embedding from file',emb_files)
+				print('with {} dims'.format(merged_emb.shape[1]))
 			else:
 				print('randomly init persona embedding')
 
@@ -149,7 +146,6 @@ class lstm_target(nn.Module):
 			combined_embed = self.speaker_linear(speaker_embed) + self.addressee_linear(addressee_embed)
 			combined_embed = nn.Tanh()(combined_embed)
 			lstm_input=torch.cat((lstm_input,combined_embed),-1)
-		self.lstmt.flatten_parameters()# FIXME:
 		_,(h,c)=self.lstmt(lstm_input.unsqueeze(1),(h,c))
 		pred=self.soft_atten(h[-1],context)
 		return pred,h,c
@@ -185,21 +181,6 @@ class lstm(nn.Module):
 		self.loss_function=torch.nn.CrossEntropyLoss(w, ignore_index=0, reduction='sum')
 
 	def forward(self,sources,targets,length,speaker_label,addressee_label):
-		# print('sources')
-		# print(sources.shape)
-		# print(sources)
-		# print('targets')
-		# print(targets.shape)
-		# print(targets)
-		# print('speaker_label')
-		# print(speaker_label.shape)
-		# print(speaker_label)
-		# print('addressee_label')
-		# print(addressee_label.shape)
-		# print(addressee_label)
-		# print('length')
-		# print(length.shape)
-		# print(length)
 		source_embed=self.sembed(sources)
 		context,h,c=self.encoder(source_embed,length)
 		loss=0
@@ -216,14 +197,10 @@ class persona:
 	
 	def __init__(self, params):
 		self.best_dev_ppl=np.inf
+		self.best_model_cnt=0
 		self.params=params
-
-		os.environ['CUDA_VISIBLE_DEVICES'] = self.params.gpu
-		use_cuda = torch.cuda.is_available()
-		device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-		self.params.device = device
-		self.params.n_gpu = torch.cuda.device_count()
-		print("gpu num: ", self.params.n_gpu)
+		self.cur_iter=0
+		self.cur_epoch=0
 
 		self.ReadDict()
 		self.Data=data(params,self.voc)
@@ -236,14 +213,14 @@ class persona:
 		self.Model.decoder.apply(self.weights_init)
 		self.Model.softlinear.apply(self.weights_init)
 
-		if self.params.n_gpu > 1:
-			self.Model = torch.nn.DataParallel(self.Model)
 
 		self.Model.to(self.device)
 		# make the save_folder
 		Path(params.save_folder).mkdir(parents=True, exist_ok=True)
 
 		self.output=path.join(params.save_folder,params.output_file)
+		self.output_best_model_log=path.join(params.save_folder,'output_best_model.log')
+		
 		if self.output!="":
 			with open(self.output,"w") as selfoutput:
 				selfoutput.write("")
@@ -266,7 +243,6 @@ class persona:
 		with open(path.join(self.params.data_folder,self.params.dictPath),'r') as doc:
 			for line in doc:
 				self.voc[line.strip()] = len(self.voc)
-		# print(self.voc)
 
 	def test(self):
 		open_train_file=path.join(self.params.data_folder,self.params.dev_file)
@@ -287,26 +263,10 @@ class persona:
 			total_tokens+=token_num
 			
 			self.Model.eval()
-			# print(batch_n)
 			
 			with torch.no_grad():
-				# print('sources')
-				# print(sources)
-				# print('targets')
-				# print(targets)
-				# print('length')
-				# print(length)
-				# print('speaker_label')
-				# print(speaker_label)
-				# print('addressee_label')
-				# print(addressee_label)
 				
 				loss = self.Model(sources,targets,length,speaker_label,addressee_label)
-				if self.params.n_gpu >= 1:
-					loss = loss.sum()
-				# print('loss')
-				# print(loss)
-				# print('*'*100)
 
 
 				total_loss+=loss.item()
@@ -314,7 +274,8 @@ class persona:
 		print("perp "+str((1/math.exp(-total_loss/total_tokens))))
 		if ppl<self.best_dev_ppl:
 			self.best_dev_ppl=ppl
-			self.save_best()
+			if self.best_dev_ppl<self.params.best_ppl_threshold:
+				self.save_best()
 		if self.output!="":
 			with open(self.output,"a") as selfoutput:
 				selfoutput.write("standard perp "+str((1/math.exp(-total_loss/total_tokens)))+"\n")
@@ -339,7 +300,15 @@ class persona:
 
 	def save_best(self):
 		save_path = path.join(self.params.save_folder,self.params.save_prefix)
-		torch.save(self.Model.state_dict(),save_path+'best')
+		torch.save(self.Model.state_dict(),save_path+'best_{}'.format(int(self.best_model_cnt)))
+		
+		
+		
+		with open(self.output_best_model_log,'a') as fout:
+			fout.write('best_model_num,{},epoch,{},iter,{:.4}\n'.format(self.best_model_cnt,
+				self.cur_epoch,
+				self.cur_iter/int(self.params.train_size/self.params.batch_size)))
+		self.best_model_cnt+=1
 		print("finished saving best model")
 
 	def saveParams(self):
@@ -349,7 +318,7 @@ class persona:
 
 	def readModel(self,save_folder,model_name,re_random_weights=None):
 		target_model = torch.load(path.join(save_folder,model_name))
-		if re_random_weights is not None:
+		if re_random_weights is not None: 
 			for weight_name in re_random_weights:
 				random_weight = self.Model.state_dict()[weight_name]
 				target_model[weight_name] = random_weight
@@ -361,15 +330,19 @@ class persona:
 			self.saveParams()
 		if self.params.fine_tuning:
 			if self.params.SpeakerMode or self.params.AddresseeMode:
-				re_random_weights = ['decoder.persona_embedding.weight'] # Also have to include some layers of the LSTM module...
+				# re_random_weights = ['decoder.persona_embedding.weight'] # Also have to include some layers of the LSTM module...
+				re_random_weights = None # FIXME: we do not re random the weights for now.
+				# TODO: use this re_random_weights's method to re-load user emb in combine training. 
 			else:
 				re_random_weights = None
-			self.readModel(self.params.save_folder,self.params,fine_tuning_model,re_random_weights)
+			print(self.params)
+			self.readModel(self.params.save_folder,self.params.fine_tunine_model,re_random_weights)
 		self.iter=0
 		start_halving=False
 		self.lr=self.params.alpha		
 		# while True:
 		for epoch in tqdm.tqdm(range(self.params.epochs)):
+			self.cur_epoch=epoch
 			self.iter+=1
 			# print("iter  "+str(self.iter))
 			if self.output!="":
@@ -380,11 +353,8 @@ class persona:
 			open_train_file=path.join(self.params.data_folder,self.params.train_file)
 			END=0
 			batch_n=0
-			# while END==0:
-			# if self.params.debug:
-			# 	self.save()
-			# 	sys.exit(-1)			
 			for iters in tqdm.tqdm(range(int(self.params.train_size/self.params.batch_size) +1 )):
+				self.cur_iter=iters
 				
 				self.Model.zero_grad()
 				END,sources,targets,speaker_label,addressee_label,length,_,_ = self.Data.read_batch(open_train_file,batch_n)
@@ -400,46 +370,20 @@ class persona:
 				speaker_label=speaker_label.to(self.device)
 				addressee_label=addressee_label.to(self.device)
 				length=length.to(self.device)
-				# print('sources')
-				# print(sources.shape)
-				# print(sources)
-				# print('targets')
-				# print(targets.shape)
-				# print(targets)
-				# print('speaker_label')
-				# print(speaker_label.shape)
-				# print(speaker_label)
-				# print('addressee_label')
-				# print(addressee_label.shape)
-				# print(addressee_label)
-				# print('length')
-				# print(length.shape)
-				# print(length)				
 				self.source_size = sources.size(0)
 				self.Model.train()
 				
 				loss = self.Model(sources,targets,length,speaker_label,addressee_label)
-				if self.params.n_gpu >= 1:
-					loss = loss.sum()
-				# print(loss)
 				loss.backward()
-				# print('loss',loss)
 				self.update()
 				if iters%self.params.eval_steps==0:
-					print('epoch',epoch,'iter',iters/int(960114/self.params.batch_size),' ',end='')
+					print('epoch',epoch,'iter',iters/int(self.params.train_size/self.params.batch_size),' ',end='')
 					self.test()
 
 
 				if END!=0:
 					break
-			# print("iter  "+str(self.iter))
-			
-				# print(self.iter,self.params.eval_steps)
-				# print("iter xxx "+str(self.iter))
-				# sys.exit(-1)
 			self.test()
 			if self.iter%self.params.save_steps==0:
 				if not self.params.no_save:
 					self.save()
-			# if self.iter==self.params.max_iter:
-			# 	break
