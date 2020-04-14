@@ -129,7 +129,7 @@ class decode_model(persona):
 		Path(params.output_folder).mkdir(parents=True, exist_ok=True)
 		self.output=path.join(self.params.output_folder,self.params.log_file)
 		if self.output!="":
-			with open(self.output,"w") as selfoutput:
+			with open(self.output,"a") as selfoutput:
 				selfoutput.write("")
 
 
@@ -164,7 +164,7 @@ class decode_model(persona):
 							self.params.decode_file+"_Addressee_"+self.params.output_file)
 		else:
 			decode_output = path.join(self.params.output_folder,self.params.decode_file+"_"+self.params.output_file)
-		with open(decode_output,"w") as open_write_file:
+		with open(decode_output,"a") as open_write_file:
 			open_write_file.write("")
 
 		END=0

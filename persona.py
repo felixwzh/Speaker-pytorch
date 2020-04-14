@@ -222,7 +222,7 @@ class persona:
 		self.output_best_model_log=path.join(params.save_folder,'output_best_model.log')
 		
 		if self.output!="":
-			with open(self.output,"w") as selfoutput:
+			with open(self.output,"a") as selfoutput:
 				selfoutput.write("")
 		if self.params.SpeakerMode:
 			print("training in speaker mode")
@@ -305,9 +305,10 @@ class persona:
 		
 		
 		with open(self.output_best_model_log,'a') as fout:
-			fout.write('best_model_num,{},epoch,{},iter,{:.4}\n'.format(self.best_model_cnt,
+			fout.write('best_model_num,{},epoch,{},iter,{:.4},dev_ppl,{}\n'.format(self.best_model_cnt,
 				self.cur_epoch,
-				self.cur_iter/int(self.params.train_size/self.params.batch_size)))
+				self.cur_iter/int(self.params.train_size/self.params.batch_size),
+				self.best_dev_ppl))
 		self.best_model_cnt+=1
 		print("finished saving best model")
 
