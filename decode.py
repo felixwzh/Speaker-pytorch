@@ -32,6 +32,8 @@ parser.add_argument("--setting", type=str, default='StochasticGreedy',
 parser.add_argument("--beam_size", type=int, default=5)
 parser.add_argument("--StochasticGreedyNum", type=int, default=5)
 
+parser.add_argument("--decode_size", type=int, default=4167)
+
 args = parser.parse_args()
 print(args)
 print()

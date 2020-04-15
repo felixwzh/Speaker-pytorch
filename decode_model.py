@@ -164,13 +164,14 @@ class decode_model(persona):
 							self.params.decode_file+"_Addressee_"+self.params.output_file)
 		else:
 			decode_output = path.join(self.params.output_folder,self.params.decode_file+"_"+self.params.output_file)
-		with open(decode_output,"a") as open_write_file:
+		with open(decode_output,"w") as open_write_file:
 			open_write_file.write("")
 
 		END=0
 		batch_n=0
 		n_decode_instance=0
-		while END==0:
+		# while END==0:
+		for iters in tqdm.tqdm(range(int(self.params.decode_size/self.params.batch_size) +1 )):
 			END,sources,targets,speaker_label,addressee_label,length,token_num,origin = self.Data.read_batch(open_train_file,batch_n,self.mode)
 			batch_n+=1
 			n_decode_instance += sources.size(0)
@@ -193,6 +194,9 @@ class decode_model(persona):
 			with torch.no_grad():
 				completed_history = self.Model(sources,targets,length,speaker_label,addressee_label,self.mode)
 			self.OutPut(decode_output,completed_history,speaker_label,addressee_label)
+			# if END!=0:
+			# 	print("decoding done")
+			# 	# return 
 		print("decoding done")
 
 	def OutPut(self,decode_output,completed_history,speaker_label,addressee_label):
