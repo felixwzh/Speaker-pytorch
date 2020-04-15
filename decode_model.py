@@ -171,7 +171,10 @@ class decode_model(persona):
 		batch_n=0
 		n_decode_instance=0
 		# while END==0:
-		for iters in tqdm.tqdm(range(int(self.params.decode_size/self.params.batch_size) +1 )):
+		
+		decode_size = len(open(open_train_file,'rU').readlines())
+		print('decode_size',decode_size)
+		for iters in tqdm.tqdm(range(int(decode_size/self.params.batch_size) +1 )):
 			END,sources,targets,speaker_label,addressee_label,length,token_num,origin = self.Data.read_batch(open_train_file,batch_n,self.mode)
 			batch_n+=1
 			n_decode_instance += sources.size(0)
