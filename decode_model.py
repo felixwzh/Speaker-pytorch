@@ -197,6 +197,10 @@ class decode_model(persona):
 			with torch.no_grad():
 				completed_history = self.Model(sources,targets,length,speaker_label,addressee_label,self.mode)
 			self.OutPut(decode_output,completed_history,speaker_label,addressee_label)
+			if self.params.decode_num!=-1:
+				if batch_n*self.params.batch_size > self.params.decode_num:
+					print('decoding done')
+					return 
 			# if END!=0:
 			# 	print("decoding done")
 			# 	# return 
