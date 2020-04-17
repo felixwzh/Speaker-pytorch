@@ -7,3 +7,5 @@ code/train_eval_tmp.ipynb
 code/transformer_generation.ipynb
 code/transformers_generation.py
 eval.sh
+eval_1.sh
+eval_2.sh
