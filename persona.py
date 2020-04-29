@@ -329,7 +329,7 @@ class persona:
 	def train(self):
 		if not self.params.no_save:
 			self.saveParams()
-		if self.params.fine_tuning:
+		if self.params.fine_tuning and self.params.fine_tunine_model!='None':
 			if self.params.SpeakerMode or self.params.AddresseeMode:
 				# re_random_weights = ['decoder.persona_embedding.weight'] # Also have to include some layers of the LSTM module...
 				re_random_weights = None # FIXME: we do not re random the weights for now.
@@ -338,6 +338,23 @@ class persona:
 				re_random_weights = None
 			print(self.params)
 			self.readModel(self.params.save_folder,self.params.fine_tunine_model,re_random_weights)
+		if self.params.get_persona_emb:
+			
+			if self.params.fine_tuning:
+				self.readModel(self.params.save_folder,self.params.fine_tunine_model,re_random_weights)
+			# write to `persona_emb_output_file`
+			
+			emb_=self.Model.decoder.persona_embedding.weight.data
+			
+			with open(self.params.persona_emb_output_file,'w') as fout:
+				for line in emb_:
+					for value in line:
+						fout.write('{}\t'.format(value))
+					fout.write('\n')
+			print('emb wrote to '+self.params.persona_emb_output_file)
+			exit(-1)
+			
+		
 		self.iter=0
 		start_halving=False
 		self.lr=self.params.alpha		
@@ -383,8 +400,19 @@ class persona:
 
 
 				if END!=0:
-					break
+					print('iters',iters)
+					# break # FIXME: this may leads to erro... test before joint training. 
 			self.test()
 			if self.iter%self.params.save_steps==0:
 				if not self.params.no_save:
 					self.save()
+		
+		if self.params.output_persona_emb_in_training:
+			emb_=self.Model.decoder.persona_embedding.weight.data
+			with open(self.params.persona_emb_output_file,'w') as fout:
+				for line in emb_:
+					for value in line:
+						fout.write('{}\t'.format(value))
+					fout.write('\n')
+			print('emb wrote to '+self.params.persona_emb_output_file)
+

@@ -53,6 +53,13 @@ parser.add_argument('--debug', action='store_true')
 parser.add_argument('--PersonaEmbFiles', type=str, default='None')
 parser.add_argument("--best_ppl_threshold", type=float, default=60.0)
 
+
+parser.add_argument('--get_persona_emb', action='store_true')
+parser.add_argument('--output_persona_emb_in_training', action='store_true')
+parser.add_argument('--persona_emb_output_file', type=str, default='None')
+
+
+
 args = parser.parse_args()
 print(args)
 print()
