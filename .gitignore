@@ -9,3 +9,9 @@ code/transformers_generation.py
 eval.sh
 eval_1.sh
 eval_2.sh
+log/
+eval_3.sh
+eval_4.sh
+eval_5.sh
+eval_6.sh
+joint-CMTF-Speaker-NEW-1.sh

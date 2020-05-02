@@ -76,7 +76,7 @@ speaker_PersonaEmbFiles="${S3CMTF_base_dir}/${S3CMTF_last_rounds_dir}/FACTOR2_it
 #     --PersonaDim ${speaker_PersonaDim} \
 #     --fine_tuning --fine_tunine_model ${seapker_fine_tunine_model} \
 #     --output_persona_emb_in_training --persona_emb_output_file ${seapker_persona_emb_output_file}
-python train.py  --data_folder ${speaker_data_folder} --save_folder  ${speaker_save_folder} --save_prefix  ${speaker_save_prefix} --output_file "${speaker_save_prefix}.log" \--SpeakerMode --PersonaNum ${speaker_PersonaNum} --PersonaEmbFiles ${speaker_PersonaEmbFiles} --batch_size ${speaker_batch_size} --layers ${speaker_layers} --epochs ${speaker_epochs} --eval_steps ${speaker_eval_steps} --save_steps ${speaker_save_steps} --train_size ${speaker_train_size} --PersonaDim ${speaker_PersonaDim} --fine_tuning --fine_tunine_model ${seapker_fine_tunine_model} --output_persona_emb_in_training --persona_emb_output_file ${seapker_persona_emb_output_file}
+CUDA_VISIBLE_DEVICES=0 python train.py  --data_folder ${speaker_data_folder} --save_folder  ${speaker_save_folder} --save_prefix  ${speaker_save_prefix} --output_file "${speaker_save_prefix}.log" \--SpeakerMode --PersonaNum ${speaker_PersonaNum} --PersonaEmbFiles ${speaker_PersonaEmbFiles} --batch_size ${speaker_batch_size} --layers ${speaker_layers} --epochs ${speaker_epochs} --eval_steps ${speaker_eval_steps} --save_steps ${speaker_save_steps} --train_size ${speaker_train_size} --PersonaDim ${speaker_PersonaDim} --fine_tuning --fine_tunine_model ${seapker_fine_tunine_model} --output_persona_emb_in_training --persona_emb_output_file ${seapker_persona_emb_output_file}
 
 # 1.2 post process some var for next training. 
 seapker_fine_tunine_model="${speaker_save_folder}/${speaker_save_prefix}${speaker_rounds_num}"
